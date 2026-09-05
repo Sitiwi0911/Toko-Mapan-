@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f4e8c">
+<link rel="manifest" href="manifest.json">
+<title>Toko Mapan 2</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#f5f7fb;color:#18202b}
+header{background:#fff;border-bottom:1px solid #e5e9f0;position:sticky;top:0;z-index:10}.top{max-width:1100px;margin:auto;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:10px}.brand img{width:44px;height:44px;border-radius:12px}.brand b{display:block;font-size:18px}.brand span{font-size:12px;color:#758095}
+.wrap{max-width:1100px;margin:auto;padding:18px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.btn{border:0;border-radius:11px;padding:11px 14px;font-weight:700;cursor:pointer}.primary{background:#2563d9;color:#fff}.light{background:#eaf0fb;color:#234}.danger{background:#fff0f0;color:#c33}
+.search{display:flex;gap:8px;margin:12px 0}.search input{flex:1;border:1px solid #dfe4ec;border-radius:12px;padding:13px;font-size:16px;background:#fff}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}.stat{background:#fff;border:1px solid #e7ebf2;border-radius:14px;padding:14px}.stat small{color:#788397}.stat b{display:block;font-size:22px;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.card{background:#fff;border:1px solid #e6eaf1;border-radius:15px;padding:15px}.name{font-weight:800;font-size:17px}.muted{font-size:12px;color:#788397}.prices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.price{background:#f6f8fc;border-radius:10px;padding:9px}.price small{display:block;color:#788397}.price b{font-size:16px}.card .row{display:flex;justify-content:flex-end;gap:7px}.empty{text-align:center;color:#7a8596;padding:45px}
+dialog{border:0;border-radius:18px;width:min(480px,calc(100% - 24px));padding:0;box-shadow:0 20px 70px #0004}dialog::backdrop{background:#0007}.modal{padding:20px}.modal h2{margin:0 0 14px}.field{margin:10px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}.field input{width:100%;padding:12px;border:1px solid #dfe4ec;border-radius:10px;font-size:16px}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.note{font-size:12px;color:#788397;line-height:1.5}
+#video{width:100%;border-radius:13px;background:#111;min-height:230px;object-fit:cover}.hidden{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:20px}.loginbox{width:min(420px,100%);background:#fff;border:1px solid #e5e9f0;border-radius:20px;padding:25px}.loginbox img{width:75px}.loginbox h1{margin:8px 0 2px}.loginbox p{color:#758095}.loginbox input{width:100%;padding:13px;margin:6px 0;border:1px solid #dfe4ec;border-radius:10px;font-size:16px}
+@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}.wrap{padding:13px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SUPABASE_URL = "GANTI_DENGAN_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "GANTI_DENGAN_SUPABASE_ANON_KEY";
+let token=localStorage.getItem("tm2_token"), user=JSON.parse(localStorage.getItem("tm2_user")||"null"), items=[], stream=null, editId=null;
+
+async function api(path, opts={}){
+  const h=Object.assign({"Content-Type":"application/json","apikey":SUPABASE_ANON_KEY},opts.headers||{});
+  if(token) h.Authorization="Bearer "+token;
+  const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{...opts,headers:h});
+  if(!r.ok) throw new Error(await r.text()); return r.status===204?null:r.json();
+}
+async function auth(path, body){
+ const r=await fetch(SUPABASE_URL+"/auth/v1/"+path,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_ANON_KEY},body:JSON.stringify(body)});
+ if(!r.ok) throw new Error(await r.text()); return r.json();
+}
+const money=n=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(Number(n)||0);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function renderLogin(msg=""){
+ app.innerHTML=`<main class="login"><section class="loginbox"><img src="icons/icon.svg"><h1>Toko Mapan 2</h1><p>Kelola harga barang toko dari HP maupun laptop.</p>
+ <input id="email" type="email" placeholder="Email"><input id="pass" type="password" placeholder="Password">
+ <button class="btn primary" style="width:100%;margin-top:8px" onclick="login()">Masuk</button>
+ <button class="btn light" style="width:100%;margin-top:8px" onclick="signup()">Buat akun</button>
+ <p class="note">${esc(msg)}</p></section></main>`;
+}
+async function login(){try{const d=await auth("token",{email:email.value,password:pass.value});setSession(d);await load()}catch(e){alert("Login gagal. Periksa email/password.")}}
+async function signup(){try{await auth("signup",{email:email.value,password:pass.value});alert("Akun dibuat. Jika email confirmation aktif, cek email dulu lalu login.")}catch(e){alert("Gagal membuat akun: "+e.message)}}
+function setSession(d){token=d.access_token;user=d.user;localStorage.setItem("tm2_token",token);localStorage.setItem("tm2_user",JSON.stringify(user))}
+async function load(){try{items=await api("products?select=*&order=name.asc");renderApp()}catch(e){localStorage.clear();token=null;user=null;renderLogin("Konfigurasi Supabase belum diisi atau sesi sudah berakhir.")}}
+function renderApp(){
+ app.innerHTML=`<header><div class="top"><div class="brand"><img src="icons/icon.svg"><div><b>Toko Mapan 2</b><span>${esc(user?.email||"")}</span></div></div><button class="btn light" onclick="logout()">Keluar</button></div></header>
+ <main class="wrap"><div class="stats"><div class="stat"><small>Total Barang</small><b>${items.length}</b></div><div class="stat"><small>Stok</small><b>${items.reduce((s,x)=>s+(+x.stock||0),0)}</b></div><div class="stat"><small>Mode</small><b>Online ☁️</b></div></div>
+ <div class="toolbar"><button class="btn primary" onclick="openForm()">＋ Tambah Barang</button><button class="btn light" onclick="scan()">▣ Scan Barcode</button></div>
+ <div class="search"><input id="q" placeholder="🔎 Cari nama atau barcode..." oninput="renderList()"></div><div id="list"></div></main>
+ <dialog id="dlg"><div class="modal"><h2 id="title">Tambah Barang</h2><div class="field"><label>Nama barang *</label><input id="name"></div><div class="field"><label>Barcode</label><input id="code"></div><div class="field"><label>Harga beli</label><input id="buy" type="number"></div><div class="field"><label>Harga jual</label><input id="sell" type="number"></div><div class="field"><label>Stok</label><input id="stock" type="number"></div><div class="actions"><button class="btn light" onclick="dlg.close()">Batal</button><button class="btn primary" onclick="save()">Simpan</button></div></div></dialog>
+ <dialog id="scanDlg"><div class="modal"><h2>Scan Barcode</h2><video id="video" autoplay playsinline></video><p id="scanMsg" class="note">Arahkan kamera ke barcode.</p><div class="actions"><button class="btn light" onclick="stopScan();scanDlg.close()">Tutup</button></div></div></dialog>`;
+ renderList();
+}
+function renderList(){const q=(document.getElementById("q")?.value||"").toLowerCase();const a=items.filter(x=>(x.name+" "+(x.barcode||"")).toLowerCase().includes(q));list.innerHTML=a.length?`<div class="grid">${a.map(x=>`<article class="card"><div class="name">${esc(x.name)}</div><div class="muted">${x.barcode?"Barcode: "+esc(x.barcode):"Tanpa barcode"} • Stok: ${x.stock||0}</div><div class="prices"><div class="price"><small>Beli</small><b>${money(x.buy_price)}</b></div><div class="price"><small>Jual</small><b>${money(x.sell_price)}</b></div></div><div class="row"><button class="btn light" onclick="edit('${x.id}')">✏️ Edit</button><button class="btn danger" onclick="del('${x.id}')">Hapus</button></div></article>`).join("")}</div>`:`<div class="empty">Belum ada barang.</div>`}
+function openForm(x=null){editId=x?.id||null;title.textContent=x?"Edit Barang":"Tambah Barang";name.value=x?.name||"";code.value=x?.barcode||"";buy.value=x?.buy_price||"";sell.value=x?.sell_price||"";stock.value=x?.stock||0;dlg.showModal();name.focus()}
+function edit(id){openForm(items.find(x=>x.id===id))}
+async function save(){if(!name.value.trim())return alert("Nama barang wajib diisi.");const body={name:name.value.trim(),barcode:code.value.trim()||null,buy_price:+buy.value||0,sell_price:+sell.value||0,stock:+stock.value||0,updated_at:new Date().toISOString()};try{if(editId)await api("products?id=eq."+editId,{method:"PATCH",body:JSON.stringify(body)});else await api("products",{method:"POST",body:JSON.stringify(body)});dlg.close();items=await api("products?select=*&order=name.asc");renderApp()}catch(e){alert("Gagal menyimpan. "+e.message)}}
+async function del(id){if(!confirm("Hapus barang ini?"))return;try{await api("products?id=eq."+id,{method:"DELETE"});items=items.filter(x=>x.id!==id);renderList()}catch(e){alert("Gagal menghapus.")}}
+async function scan(){scanDlg.showModal();try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});video.srcObject=stream;await video.play();if(!("BarcodeDetector" in window)){scanMsg.textContent="Browser ini tidak mendukung scan otomatis. Isi barcode manual.";return}const detector=new BarcodeDetector();const loop=async()=>{if(!stream)return;try{const c=await detector.detect(video);if(c.length){const val=c[0].rawValue;stopScan();scanDlg.close();openForm(items.find(x=>x.barcode===val)||null);code.value=val;return}}catch(e){}requestAnimationFrame(loop)};loop()}catch(e){scanMsg.textContent="Kamera tidak dapat dibuka. Periksa izin kamera."}}
+function stopScan(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+function logout(){localStorage.clear();token=null;user=null;renderLogin()}
+if(!SUPABASE_URL.startsWith("http")) renderLogin("Aplikasi siap. Hubungkan ke Supabase untuk mengaktifkan login & sinkronisasi."); else if(token)load();else renderLogin();
+</script>
+</body></html>
